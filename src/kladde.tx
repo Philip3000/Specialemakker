@@ -1,0 +1,409 @@
+import React, { useState, useEffect } from 'react';
+import { auth, firestore, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from './firebase';
+import axios from 'axios';
+import 'bootstrap/dist/css/bootstrap.min.css';
+import { Container, Navbar, Nav, Button, Col, Row, Card, Modal, Form } from 'react-bootstrap';
+import { Search, Binoculars, BuildingFill, Calendar, PeopleFill } from 'react-bootstrap-icons';
+
+const App = () => {
+  const [posts, setPosts] = useState([]);
+  const [showCreateModal, setShowCreateModal] = useState(false); 
+  const [user, setUser] = useState(null);
+  const [role, setRole] = useState(null); 
+
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    subject: '',
+    universityName: '',
+    fieldOfStudy: '',
+    startMonth: '',
+    endMonth: '',
+    amountOfPeople: '',
+    email: '',
+    phone: '',
+    gradeImportance: ''
+  });
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authMode, setAuthMode] = useState('signIn'); // 'signIn' or 'signUp'
+  const [authFormData, setAuthFormData] = useState({
+    email: '',
+    password: '',
+    confirmPassword: ''
+  });
+  
+  const handleAuthChange = (e) => {
+    const { name, value } = e.target;
+    setAuthFormData({ ...authFormData, [name]: value });
+  };
+  
+  const handleAuthSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      if (authMode === 'signIn') {
+        await signInWithEmailAndPassword(auth, authFormData.email, authFormData.password);
+      } else {
+        if (authFormData.password !== authFormData.confirmPassword) {
+          alert("Passwords don't match");
+          return;
+        }
+        await createUserWithEmailAndPassword(auth, authFormData.email, authFormData.password);
+      }
+      setShowAuthModal(false);
+    } catch (error) {
+      console.error("Authentication error:", error);
+    }
+  };
+  
+  const handleShowAuthModal = (mode) => {
+    setAuthMode(mode);
+    setShowAuthModal(true);
+  };
+  
+  const handleCloseAuthModal = () => setShowAuthModal(false);
+  
+  useEffect(() => {
+    axios.get('http://localhost:5000/posts')
+      .then(response => setPosts(response.data))
+      .catch(error => console.error(error));
+    
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      if (user) {
+        setUser(user);
+        const roleDoc = await firestore.collection('roles').doc(user.uid).get();
+        if (roleDoc.exists) {
+          setRole(roleDoc.data().role);
+        } else {
+          setRole('user');
+        }
+      } else {
+        setUser(null);
+        setRole(null);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const time = `${formData.startMonth} to ${formData.endMonth}`;
+    axios.post('http://localhost:5000/posts', { ...formData, time })
+      .then(response => {
+        setPosts([...posts, response.data]);
+        setFormData({
+          title: '',
+          description: '',
+          subject: '',
+          universityName: '',
+          fieldOfStudy: '',
+          startMonth: '',
+          endMonth: '',
+          amountOfPeople: '',
+          email: '',
+          phone: '',
+          gradeImportance: ''
+        });
+        setShowCreateModal(false);
+      })
+      .catch(error => console.error(error));
+  };
+
+  const handleShowCreateModal = () => setShowCreateModal(true);
+  const handleCloseCreateModal = () => setShowCreateModal(false);
+
+  return (
+    <div>
+      <Navbar bg="dark" variant="dark" expand="lg">
+  <Navbar.Brand href="#home">Specialemakker</Navbar.Brand>
+  <Nav className="mr-auto">
+    <Nav.Link href="#home">Home</Nav.Link>
+    <Nav.Link href="#posts">Posts</Nav.Link>
+  </Nav>
+  {user ? (
+    <>
+      {role === 'admin' && (
+        <Button variant="primary" onClick={handleShowCreateModal}>
+          Create New Post
+        </Button>
+      )}
+      <Button variant="outline-light" onClick={() => auth.signOut()}>
+        Sign Out
+      </Button>
+    </>
+  ) : (
+    <Button variant="outline-light" onClick={() => handleShowAuthModal('signIn')}>
+      Sign In
+    </Button>
+  )}
+</Navbar>
+
+      <Container className="my-4">
+        <Row>
+          {posts.map((post) => (
+            <Col md={2} key={post._id} className="mb-4">
+              <Card style={{ height: '200px', display: 'flex', flexDirection: 'column' }}>
+  <Card.Body className="d-flex flex-column p-2">
+    <Card.Title style={{ fontSize: '20px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+      {post.title}
+    </Card.Title>
+    <Card.Text style={{ fontSize: '16px', margin: '0', lineHeight: '1' }}>
+      <BuildingFill className="me-1" />
+      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'inline-block', maxWidth: '120px' }}>
+        {post.universityName}
+      </span>
+    </Card.Text>
+    <Card.Text style={{ fontSize: '16px', margin: '0', lineHeight: '1' }}>
+      <Binoculars className="me-1" />
+      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'inline-block', maxWidth: '120px' }}>
+        {post.fieldOfStudy}
+      </span>
+    </Card.Text>
+    <Card.Text style={{ fontSize: '16px', margin: '0', lineHeight: '1' }}>
+      <Search className="me-1" />
+      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'inline-block', maxWidth: '120px' }}>
+        {post.subject}
+      </span>
+    </Card.Text>
+    <Card.Text style={{ fontSize: '16px', margin: '0', lineHeight: '1' }}>
+      <Calendar className="me-1" />
+      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'inline-block', maxWidth: '120px' }}>
+        {post.time}
+      </span>
+    </Card.Text>
+    <Card.Text style={{ fontSize: '16px', margin: '0', lineHeight: '1' }}>
+      <PeopleFill className="me-1" /> {post.amountOfPeople} needed
+    </Card.Text>
+    <Button variant="primary" size="sm" className="mt-auto">
+      Learn more
+    </Button>
+  </Card.Body>
+</Card>
+
+            </Col>
+          ))}
+        </Row>
+      </Container>
+      
+      <Modal show={showAuthModal} onHide={handleCloseAuthModal}>
+  <Modal.Header closeButton>
+    <Modal.Title>{authMode === 'signIn' ? 'Sign In' : 'Sign Up'}</Modal.Title>
+  </Modal.Header>
+  <Modal.Body>
+    <Form onSubmit={handleAuthSubmit}>
+      <Form.Group controlId="formEmail">
+        <Form.Label>Email</Form.Label>
+        <Form.Control
+          type="email"
+          name="email"
+          value={authFormData.email}
+          onChange={handleAuthChange}
+          placeholder="Enter email"
+          required
+        />
+      </Form.Group>
+      <Form.Group controlId="formPassword">
+        <Form.Label>Password</Form.Label>
+        <Form.Control
+          type="password"
+          name="password"
+          value={authFormData.password}
+          onChange={handleAuthChange}
+          placeholder="Enter password"
+          required
+        />
+      </Form.Group>
+      {authMode === 'signUp' && (
+        <Form.Group controlId="formConfirmPassword">
+          <Form.Label>Confirm Password</Form.Label>
+          <Form.Control
+            type="password"
+            name="confirmPassword"
+            value={authFormData.confirmPassword}
+            onChange={handleAuthChange}
+            placeholder="Confirm password"
+            required
+          />
+        </Form.Group>
+      )}
+      <Button variant="primary" type="submit" className="w-100">
+        {authMode === 'signIn' ? 'Sign In' : 'Sign Up'}
+      </Button>
+    </Form>
+  </Modal.Body>
+  <Modal.Footer>
+    <Button variant="secondary" onClick={handleCloseAuthModal}>
+      Close
+    </Button>
+    {authMode === 'signIn' ? (
+      <Button variant="link" onClick={() => handleShowAuthModal('signUp')}>
+        Need an account? Sign Up
+      </Button>
+    ) : (
+      <Button variant="link" onClick={() => handleShowAuthModal('signIn')}>
+        Already have an account? Sign In
+      </Button>
+    )}
+  </Modal.Footer>
+</Modal>
+      <Modal show={showCreateModal} onHide={handleCloseCreateModal}>
+        <Modal.Header closeButton>
+          <Modal.Title>Create a New Post</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form onSubmit={handleSubmit}>
+            <Form.Group controlId="formTitle">
+              <Form.Label>Title</Form.Label>
+              <Form.Control
+                type="text"
+                name="title"
+                value={formData.title}
+                onChange={handleChange}
+                placeholder="Enter title"
+                required
+              />
+            </Form.Group>
+            <Form.Group controlId="formDescription">
+              <Form.Label>Description</Form.Label>
+              <Form.Control
+                as="textarea"
+                rows={2}
+                name="description"
+                value={formData.description}
+                onChange={handleChange}
+                placeholder="Enter description"
+                required
+              />
+            </Form.Group>
+            <Form.Group controlId="formSubject">
+              <Form.Label>Subject</Form.Label>
+              <Form.Control
+                type="text"
+                name="subject"
+                value={formData.subject}
+                onChange={handleChange}
+                placeholder="Enter subject"
+                required
+              />
+            </Form.Group>
+            <Form.Group controlId="formUniversityName">
+              <Form.Label>University Name</Form.Label>
+              <Form.Control
+                type="text"
+                name="universityName"
+                value={formData.universityName}
+                onChange={handleChange}
+                placeholder="Enter university name"
+                required
+              />
+            </Form.Group>
+            <Form.Group controlId="formFieldOfStudy">
+              <Form.Label>Field of Study</Form.Label>
+              <Form.Control
+                type="text"
+                name="fieldOfStudy"
+                value={formData.fieldOfStudy}
+                onChange={handleChange}
+                placeholder="Enter field of study"
+                required
+              />
+            </Form.Group>
+            <Form.Group controlId="formStartMonth">
+              <Form.Label>Start Month</Form.Label>
+              <Form.Control
+                as="select"
+                name="startMonth"
+                value={formData.startMonth}
+                onChange={handleChange}
+                required
+              >
+                <option value="">Select start month</option>
+                <option value="January">January</option>
+                <option value="February">February</option>
+                <option value="March">March</option>
+                {/* Add other months as options */}
+              </Form.Control>
+            </Form.Group>
+            <Form.Group controlId="formEndMonth">
+              <Form.Label>End Month</Form.Label>
+              <Form.Control
+                as="select"
+                name="endMonth"
+                value={formData.endMonth}
+                onChange={handleChange}
+                required
+              >
+                <option value="">Select end month</option>
+                <option value="April">April</option>
+                <option value="May">May</option>
+                <option value="June">June</option>
+                {/* Add other months as options */}
+              </Form.Control>
+            </Form.Group>
+            <Form.Group controlId="formAmountOfPeople">
+              <Form.Label>Amount of People Needed</Form.Label>
+              <Form.Control
+                type="number"
+                name="amountOfPeople"
+                value={formData.amountOfPeople}
+                onChange={handleChange}
+                min="1"
+                max="4"
+                required
+              />
+            </Form.Group>
+            <Form.Group controlId="formEmail">
+              <Form.Label>Email</Form.Label>
+              <Form.Control
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                placeholder="Enter email"
+                required
+              />
+            </Form.Group>
+            <Form.Group controlId="formPhone">
+              <Form.Label>Phone</Form.Label>
+              <Form.Control
+                type="tel"
+                name="phone"
+                value={formData.phone}
+                onChange={handleChange}
+                placeholder="Enter phone number"
+                required
+              />
+            </Form.Group>
+            <Form.Group controlId="formGradeImportance">
+              <Form.Label>Grade Importance (1-10)</Form.Label>
+              <Form.Control
+                type="number"
+                name="gradeImportance"
+                value={formData.gradeImportance}
+                onChange={handleChange}
+                min="1"
+                max="10"
+                required
+              />
+            </Form.Group>
+            <Button variant="primary" type="submit" className="w-100">
+              Create Post
+            </Button>
+          </Form>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={handleCloseCreateModal}>
+            Close
+          </Button>
+        </Modal.Footer>
+      </Modal>
+    </div>
+  );
+};
+
+export default App;
