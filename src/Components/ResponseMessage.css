@@ -1,0 +1,10 @@
+.response-message {
+    position: fixed;
+    bottom: 20px; /* Distance from the bottom of the viewport */
+    right: 20px;  /* Distance from the right of the viewport */
+    z-index: 10000; /* Ensure it's above other content */
+    width: auto;   /* Automatic width, but you can set a fixed width if needed */
+    max-width: 300px; /* Max width to keep it from being too wide */
+    margin-right: 20px;
+  }
+  

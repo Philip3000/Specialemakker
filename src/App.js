@@ -17,41 +17,39 @@ import {
   Navbar, 
   Nav, 
   Button, 
-  Col, 
-  Row, 
-  Card, 
-  Modal, 
-  Form 
 } from 'react-bootstrap';
 import { 
-  Search, 
-  Binoculars, 
-  BuildingFill, 
-  Calendar, 
-  PeopleFill 
+ 
+  HouseFill,
+  FileEarmarkPlusFill, 
+  Stack
 } from 'react-bootstrap-icons';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import ProfilePage from './Pages/ProfilePage';
 import PostsPage from './Pages/PostsPage';
 import FrontPage from './Pages/FrontPage';
 import NoPage from './Pages/NoPage';
+import AuthModal from "./Components/AuthModal";
+import CreatePostModal from './Components/CreatePostModal';
 import { getFunctions, httpsCallable } from "firebase/functions";
+import ResponseMessage from './Components/ResponseMessage'; // Import the ResponseMessage component
+import './Components/ResponseMessage.css'
 
 const App = () => {
-  const postAuthorEmail = "email@example.com"; // Placeholder for post author email
 
   // State declarations
   const [userData, setUserData] = useState(false);
-  const [contactModal, setContactModal] = useState(false);
   const [posts, setPosts] = useState([]);
   const [universities, setUniversities] = useState([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(null);
-  const [showPostModal, setShowPostModal] = useState(false);
-  const [selectedPost, setSelectedPost] = useState(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [hasPost, setHasPost] = useState(false);
   const [authMode, setAuthMode] = useState('signIn');
+  const [showMessage, setShowMessage] = useState(false);
+  const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState('success');
   
   // Authentication form data
   const [authFormData, setAuthFormData] = useState({
@@ -66,15 +64,17 @@ const App = () => {
     description: '',
     subject: '',
     universityName: '',
+    customUniversityName: '',
     fieldOfStudy: '',
     startMonth: '',
+    startYear: '',
     endMonth: '',
+    endYear: '',
     amountOfPeople: '',
     email: '',
     phone: '',
-    gradeImportance: ''
+    gradeImportance: '',
   });
-
   // Filter settings
 
   // Fetch initial data on component mount
@@ -86,13 +86,16 @@ const App = () => {
           axios.get('http://localhost:5000/institutioner')
         ]);
         setPosts(postsRes.data);
+      if (user) {
+        const userHasPost = postsRes.data.some(post => post.maker === user.uid);
+        setHasPost(userHasPost); // Set true if user has a post
+      }
         setUniversities(universitiesRes.data);
       } catch (error) {
         console.error('Error fetching data:', error);
       }
     };
     
-    fetchData();
     
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
       if (user) {
@@ -107,22 +110,12 @@ const App = () => {
         setRole(null);
       }
     });
+    fetchData();
 
     return () => unsubscribe();
   }, []);
 
-  // Send email using Firebase functions
-  const sendEmail = async (recipientEmail, message, includePhone, userInfo) => {
-    const functions = getFunctions();
-    const sendEmailFunc = httpsCallable(functions, "sendEmail");
-    
-    try {
-      const result = await sendEmailFunc({ recipientEmail, message, includePhone, userInfo });
-      console.log(result.data);
-    } catch (error) {
-      console.error("Error sending email:", error);
-    }
-  };
+  
 
   // Fetch user role from Firestore
   const fetchUserRole = async (user) => {
@@ -151,29 +144,6 @@ const App = () => {
     }
   };
 
-  // Handle user contact actions
-  const handleContactUser = () => {
-    if (!user) {
-      handleShowAuthModal("signIn");
-    } else {
-      setContactModal(true);
-    }
-  };
-
-  // Send email after user submits the contact form
-  const handleSendEmail = () => {
-    const message = "Your message here...";
-    const includePhone = true; // based on user checkbox
-    const userInfo = {
-      email: user.email,
-      phone: "123-456-7890", // fetch from user's profile
-      fieldOfStudy: "Computer Science",
-      universityName: "Harvard University",
-    };
-
-    sendEmail(postAuthorEmail, message, includePhone, userInfo);
-    setContactModal(false); // Close modal after sending
-  };
 
   // Handle form data changes
   const handleChange = (e) => {
@@ -184,12 +154,24 @@ const App = () => {
   // Handle post submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const time = `${formData.startMonth} to ${formData.endMonth}`;
+    const time = `${formData.startMonth.slice(0, 3)} ${formData.startYear.slice(-2)}' to ${formData.endMonth.slice(0, 3)} ${formData.endYear.slice(-2)}'`;
+    const maker = user ? user.uid : null; // Ensure user is available
+  
     try {
+       // Check if the user has already created a post
+       const existingPost = await axios.get(`http://localhost:5000/posts?maker=${maker}`);
+
+       if (existingPost.data.length > 0) {
+         // If the user already has a post, display a warning message
+         setMessageType('danger');
+         setMessage('You already have a post')
+         setShowMessage(true);
+         return;
+       }
       const response = await axios.post('http://localhost:5000/posts', { 
         ...formData, 
         time, 
-        maker: user.uid 
+        maker
       });
       setPosts(prevPosts => [...prevPosts, response.data]);
       setFormData({
@@ -197,17 +179,24 @@ const App = () => {
         description: '',
         subject: '',
         universityName: '',
+        customUniversityName: '',
         fieldOfStudy: '',
         startMonth: '',
+        startYear: '',
         endMonth: '',
+        endYear: '',
         amountOfPeople: '',
         email: '',
         phone: '',
         gradeImportance: '',
       });
       setShowCreateModal(false);
+      setMessage('Post created succesfully')
+      setShowMessage(true);
     } catch (error) {
-      console.error('Error creating post:', error);
+      setMessage('Error creating post:', error)
+      setMessageType('danger');
+      setShowMessage(true);
     }
   };
 
@@ -217,45 +206,53 @@ const App = () => {
     setAuthFormData(prevState => ({ ...prevState, [name]: value }));
   };
 
-  // Handle authentication submission
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
     try {
+      setMessageType('success');
       if (authMode === 'signIn') {
         await signInWithEmailAndPassword(auth, authFormData.email, authFormData.password);
+        setMessage('Signed in successfully');
+        setShowMessage(true);
       } else {
+        // Check if passwords match
         if (authFormData.password !== authFormData.confirmPassword) {
-          alert("Passwords don't match");
+          setMessage("Passwords don't match");
+          setMessageType('danger');
+          setShowMessage(true);
           return;
         }
-        
+  
+        // Create user
         const userCredential = await createUserWithEmailAndPassword(auth, authFormData.email, authFormData.password);
         const newUser = userCredential.user;
-
+  
+        // Set user data in Firestore
         const userData = {
           email: newUser.email,
           phone: '',
           universityName: '',
           fieldOfStudy: '',
-          role: 'admin'
+          role: 'admin',
         };
         await setDoc(doc(firestore, 'users', newUser.uid), userData);
+  
+        setMessage('Signed up successfully');
+        setShowMessage(true);
       }
   
       setShowAuthModal(false);
     } catch (error) {
-      console.error("Authentication error:", error);
+      // Extracting error message
+      const errorMessage = error.message; // This will give you a user-friendly message
+      setMessage(`Authentication error: ${errorMessage}`);
+      setMessageType('danger');
+      setShowMessage(true);
     }
   };
 
-  // Show and hide modals
-  const handleShowPostModal = (post) => {
-    setSelectedPost(post);
-    setShowPostModal(true);
-  };
+ 
 
-  const handleClosePostModal = () => setShowPostModal(false);
-  const handleShowCreateModal = () => setShowCreateModal(true);
   const handleCloseCreateModal = () => setShowCreateModal(false);
   const handleShowAuthModal = (mode) => {
     setAuthMode(mode);
@@ -270,271 +267,83 @@ const App = () => {
     <BrowserRouter>
     <div>
       
-      <Navbar bg="dark" variant="dark" expand="lg">
-        <Navbar.Brand href="/">Specialemakker</Navbar.Brand>
-        <Nav className="mr-auto">
-          <Nav.Link href="/">Home</Nav.Link>
-          <Nav.Link href="#posts">Posts</Nav.Link>
-        </Nav>
-        {user ? (
-          <>
-            {role === 'admin' && (
-              <Button variant="primary" onClick={() => setShowCreateModal(true)}>
-                Create New Post
-              </Button>
-            )}
-            <Button variant="outline-light" onClick={() => signOut(auth)}>
-              Sign Out
+    <Navbar bg="dark" variant="dark" expand="lg">
+  <Navbar.Brand href="/" className='ml-5'>Specialemakker.dk</Navbar.Brand>
+  
+  {/* Navbar toggle for small screens */}
+  <Navbar.Toggle aria-controls="basic-navbar-nav" />
+  
+  {/* Collapsible nav items */}
+  <Navbar.Collapse id="basic-navbar-nav">
+    <Nav className="mr-auto">
+      <Nav.Link href="/">Home <HouseFill className="me-1 align-middle" /></Nav.Link>
+      <Nav.Link href="/posts">Posts <Stack className='me-1 align-middle'/></Nav.Link>
+      
+    </Nav>
+    </Navbar.Collapse>
+
+    {/* Authentication buttons */}
+    <div style={{ display: 'flex', alignItems: 'center', marginLeft: 'auto', marginRight: '20px' }}>
+    {user && role === 'admin' && (
+        <Button variant="primary" onClick={() => setShowCreateModal(true)} className="me-2">
+          Create Post <FileEarmarkPlusFill className="me-1" />
+        </Button>
+      )}
+      {user ? (
+        <>
+          <div style={{ marginRight: '20px'}}>
+            <Button variant="outline-light" href="/profile" className="ms-2">
+              Profile
             </Button>
-          </>
-        ) : (
-          <Button variant="outline-light" onClick={() => handleShowAuthModal('signIn')}>
-            Sign In
+          </div>
+          <Button variant="outline-light" onClick={() => signOut(auth)} className="me-3">
+            Sign Out
           </Button>
-        )}
-      </Navbar>
+        </>
+      ) : (
+        <Button variant="outline-light" onClick={() => handleShowAuthModal('signIn')}>
+          Sign In
+        </Button>
+      )}
+    </div>
+</Navbar>
+
 
       <Routes>
         <Route path="/" element={<FrontPage />} />
         <Route path="/posts" element={<PostsPage posts={posts} user={user} />} /> {/* Add the new route for posts */}
-        <Route path="/profile/:userId" element={<ProfilePage />} />
+        <Route path="/profile" element={<ProfilePage />} />
         <Route path="*" element={<NoPage />} />
       </Routes>
 
    
-      <Modal show={showPostModal} onHide={handleClosePostModal}>
-  <Modal.Header closeButton>
-    <Modal.Title>{selectedPost?.title}</Modal.Title>
-  </Modal.Header>
-  <Modal.Body>
-    <p>{selectedPost?.description}</p>
-    <p><strong>Field of Study:</strong> {selectedPost?.fieldOfStudy}</p>
-    <p><strong>University:</strong> {selectedPost?.universityName}</p>
-    <p><strong>Time:</strong> {selectedPost?.time}</p>
-    {/* Add other post details as needed */}
-  </Modal.Body>
-  <Modal.Footer>
-  <Button onClick={() => handleContactUser(selectedPost.email)}>Contact User</Button>
-  <Modal show={contactModal} onHide={() => setContactModal(false)}>
-      <Modal.Header closeButton>
-        <Modal.Title>Contact User</Modal.Title>
-      </Modal.Header>
-      <Modal.Body>
-        <Form.Group>
-          <Form.Label>Message</Form.Label>
-          <Form.Control as="textarea" rows={3} />
-        </Form.Group>
-        
-      </Modal.Body>
-      <Modal.Footer>
-        <Button variant="primary" onClick={handleSendEmail}>
-          Send Email
-        </Button>
-      </Modal.Footer>
-    </Modal>
-    <Button variant="secondary" onClick={handleClosePostModal}>
-      Close
-    </Button>
-  </Modal.Footer>
-</Modal>
-      <Modal show={showCreateModal} onHide={handleCloseCreateModal}>
-        <Modal.Header closeButton>
-          <Modal.Title>Create a New Post</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form onSubmit={handleSubmit}>
-            <Form.Group controlId="formTitle">
-              <Form.Label>Title</Form.Label>
-              <Form.Control
-                type="text"
-                name="title"
-                value={formData.title}
-                onChange={handleChange}
-                placeholder="Enter title"
-                required
-              />
-            </Form.Group>
-            <Form.Group controlId="formDescription">
-              <Form.Label>Description</Form.Label>
-              <Form.Control
-                as="textarea"
-                rows={2}
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                placeholder="Enter description"
-                required
-              />
-            </Form.Group>
-            <Form.Group controlId="formSubject">
-              <Form.Label>Subject</Form.Label>
-              <Form.Control
-                type="text"
-                name="subject"
-                value={formData.subject}
-                onChange={handleChange}
-                placeholder="Enter subject"
-                required
-              />
-            </Form.Group>
-            <Form.Group controlId="formUniversityName">
-  <Form.Label>University Name</Form.Label>
-  <Form.Control
-    as="select"
-    name="universityName"
-    value={formData.universityName}
-    onChange={handleChange}
-    required
-  >
-    <option value="">Select a university</option>
-    {universities.map((university) => (
-      <option key={university._id} value={university.name}>
-        {university.name}
-      </option>
-    ))}
-    <option value="custom">Enter a custom university name</option>
-  </Form.Control>
-  {formData.universityName === 'custom' && (
-    <Form.Control
-      type="text"
-      name="universityName"
-      value={formData.customUniversityName || ''}
-      onChange={(e) => setFormData({ ...formData, customUniversityName: e.target.value })}
-      placeholder="Enter custom university name"
-    />
-  )}
-</Form.Group>
-            <Form.Group controlId="formFieldOfStudy">
-              <Form.Label>Field of Study</Form.Label>
-              <Form.Control
-                type="text"
-                name="fieldOfStudy"
-                value={formData.fieldOfStudy}
-                onChange={handleChange}
-                placeholder="Enter field of study"
-                required
-              />
-            </Form.Group>
-            <Form.Group controlId="formStartMonth">
-              <Form.Label>Start Month</Form.Label>
-              <Form.Control
-                as="select"
-                name="startMonth"
-                value={formData.startMonth}
-                onChange={handleChange}
-                required
-              >
-                <option value="">Select start month</option>
-                <option value="January">January</option>
-                <option value="February">February</option>
-                <option value="March">March</option>
-                {/* Add other months as options */}
-              </Form.Control>
-            </Form.Group>
-            <Form.Group controlId="formEndMonth">
-              <Form.Label>End Month</Form.Label>
-              <Form.Control
-                as="select"
-                name="endMonth"
-                value={formData.endMonth}
-                onChange={handleChange}
-                required
-              >
-                <option value="">Select end month</option>
-                <option value="April">April</option>
-                <option value="May">May</option>
-                <option value="June">June</option>
-                {/* Add other months as options */}
-              </Form.Control>
-            </Form.Group>
-            <Form.Group controlId="formAmountOfPeople">
-              <Form.Label>Amount of People Needed</Form.Label>
-              <Form.Control
-                type="number"
-                name="amountOfPeople"
-                value={formData.amountOfPeople}
-                onChange={handleChange}
-                min="1"
-                max="4"
-                required
-              />
-            </Form.Group>
-            <Form.Group controlId="formEmail">
-              <Form.Label>Email</Form.Label>
-              <Form.Control
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="Enter email"
-                required
-              />
-            </Form.Group>
-            <Form.Group controlId="formPhone">
-              <Form.Label>Phone</Form.Label>
-              <Form.Control
-                type="tel"
-                name="phone"
-                value={formData.phone}
-                onChange={handleChange}
-                placeholder="Enter phone number"
-                required
-              />
-            </Form.Group>
-            <Form.Group controlId="formGradeImportance">
-              <Form.Label>Grade Importance (1-10)</Form.Label>
-              <Form.Control
-                type="number"
-                name="gradeImportance"
-                value={formData.gradeImportance}
-                onChange={handleChange}
-                min="1"
-                max="10"
-                required
-              />
-            </Form.Group>
-            <Button variant="primary" type="submit" className="w-100">
-              Create Post
-            </Button>
-          </Form>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={handleCloseCreateModal}>
-            Close
-          </Button>
-        </Modal.Footer>
-      </Modal>
+     
+      {showMessage && (
+        <ResponseMessage
+          message={message}
+          type={messageType}
+          duration={3000} // Auto-dismiss after 3 seconds
+          onClose={() => setShowMessage(false)}
+        />
+      )}
+<CreatePostModal
+        showCreateModal={showCreateModal}
+        handleCloseCreateModal={handleCloseCreateModal}
+        handleSubmit={handleSubmit}
+        formData={formData}
+        handleChange={handleChange}
+        universities={universities}
+      />
+     
+      <AuthModal 
+  show={showAuthModal} 
+  handleClose={handleCloseAuthModal} 
+  authMode={authMode} 
+  handleAuthChange={handleAuthChange} 
+  handleAuthSubmit={handleAuthSubmit} 
+  authFormData={authFormData} 
+/>
 
-      <Modal show={showAuthModal} onHide={handleCloseAuthModal}>
-        <Modal.Header closeButton>
-          <Modal.Title>{authMode === 'signIn' ? 'Sign In' : 'Sign Up'}</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form onSubmit={handleAuthSubmit}>
-            <Form.Group controlId="formEmail">
-              <Form.Label>Email address</Form.Label>
-              <Form.Control type="email" name="email" value={authFormData.email} onChange={handleAuthChange} required />
-            </Form.Group>
-            <Form.Group controlId="formPassword">
-              <Form.Label>Password</Form.Label>
-              <Form.Control type="password" name="password" value={authFormData.password} onChange={handleAuthChange} required />
-            </Form.Group>
-            {authMode === 'signUp' && (
-              <Form.Group controlId="formConfirmPassword">
-                <Form.Label>Confirm Password</Form.Label>
-                <Form.Control type="password" name="confirmPassword" value={authFormData.confirmPassword} onChange={handleAuthChange} required />
-              </Form.Group>
-            )}
-            <Button variant="primary" type="submit">
-              {authMode === 'signIn' ? 'Sign In' : 'Sign Up'}
-            </Button>
-            <Button variant="link" onClick={() => setAuthMode(authMode === 'signIn' ? 'signUp' : 'signIn')}>
-              {authMode === 'signIn' ? 'Need an account? Sign Up' : 'Have an account? Sign In'}
-            </Button>
-          </Form>
-        </Modal.Body>
-      </Modal>
-      
     </div>
     </BrowserRouter>
   );
