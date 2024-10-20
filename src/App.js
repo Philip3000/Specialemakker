@@ -34,7 +34,7 @@ import CreatePostModal from './Components/CreatePostModal';
 import { getFunctions, httpsCallable } from "firebase/functions";
 import ResponseMessage from './Components/ResponseMessage'; // Import the ResponseMessage component
 import './Components/ResponseMessage.css'
-
+import './App.css'
 const App = () => {
 
   // State declarations
@@ -312,7 +312,7 @@ const App = () => {
         {/* Authentication buttons */}
         <div style={{ display: 'flex', alignItems: 'center', marginLeft: 'auto' }}>
           {(user && (role === 'admin' || role === 'user')) && (
-            <Button variant="primary" onClick={() => setShowCreateModal(true)} className="me-2 d-none d-sm-block">
+            <Button variant="primary" onClick={() => setShowCreateModal(true)} className="me-2 d-none d-lg-block">
               Create Post <FileEarmarkPlusFill className="me-1" />
             </Button>
           )}
