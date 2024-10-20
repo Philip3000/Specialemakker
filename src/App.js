@@ -288,53 +288,56 @@ const App = () => {
     <div>
       
     <Navbar bg="dark" variant="dark" expand="lg">
-  <Navbar.Brand href="/" className='ms-3' style={{ color: '#87CEFA' }} >
-  Specialemakker.dk
-  </Navbar.Brand>
-  
-  {/* Navbar toggle for small screens */}
-  <Navbar.Toggle aria-controls="basic-navbar-nav" />
-  
-  {/* Collapsible nav items */}
-  <Navbar.Collapse id="basic-navbar-nav">
-    <Nav className="mr-auto">
-      <Nav.Link href="/">Home <HouseFill className="me-1 align-middle" /></Nav.Link>
-      <Nav.Link href="/posts">Posts <Stack className='me-1 align-middle'/></Nav.Link>
-    </Nav>
-    </Navbar.Collapse>
-
-    {/* Authentication buttons */}
-    <div style={{ display: 'flex', alignItems: 'center', marginLeft: 'auto', marginRight: '20px' }}>
-    {(user && (role === 'admin' || role === 'user')) && (
-  <Button variant="primary" onClick={() => setShowCreateModal(true)} className="me-2">
-    Create Post <FileEarmarkPlusFill className="me-1" />
-  </Button>
-)}
-      {user ? (
-        <>
-          <div style={{ marginRight: '20px'}}>
-            <Button variant="outline-light" href="/profile" className="ms-2">
-              Profile
+      <Navbar.Brand href="/" className='ms-3' style={{ color: '#87CEFA' }}>
+        Specialemakker.dk
+      </Navbar.Brand>
+      {(user && (role === 'admin' || role === 'user')) && (
+            <Button variant="primary" onClick={() => setShowCreateModal(true)} style={{ marginLeft: 'auto'}} className="me-2  d-lg-none">
+              Create Post <FileEarmarkPlusFill className="me-1" />
             </Button>
-          </div>
-          <Button variant="outline-light" onClick={() => signOut(auth)} className="me-3">
-            Sign Out
-          </Button>
-        </>
-      ) : (
-        <>
-        <Button variant="outline-light" onClick={() => handleShowAuthModal('signUp')}>
-                    Sign Up
-                  </Button>
-        <Button variant="outline-light" onClick={() => handleShowAuthModal('signIn')} className="ms-3">
-          Sign In
-        </Button>
-        </>
+          )}
+      {/* Navbar toggle for small screens */}
+      <Navbar.Toggle 
+        aria-controls="basic-navbar-nav" 
+        style={{ border: 'none' }} // Remove outline
+      />
       
-      )}
-    </div>
-</Navbar>
-
+      {/* Collapsible nav items */}
+      <Navbar.Collapse id="basic-navbar-nav">
+        <Nav className="mr-auto">
+          <Nav.Link href="/">Home <HouseFill className="me-1 align-middle" /></Nav.Link>
+          <Nav.Link href="/posts">Posts <Stack className='me-1 align-middle' /></Nav.Link>
+        </Nav>
+        
+        {/* Authentication buttons */}
+        <div style={{ display: 'flex', alignItems: 'center', marginLeft: 'auto' }}>
+          {(user && (role === 'admin' || role === 'user')) && (
+            <Button variant="primary" onClick={() => setShowCreateModal(true)} className="me-2 d-none d-sm-block">
+              Create Post <FileEarmarkPlusFill className="me-1" />
+            </Button>
+          )}
+          {user ? (
+            <>
+              <Button variant="outline-light" href="/profile" className="ms-2">
+                Profile
+              </Button>
+              <Button variant="outline-light" onClick={() => signOut(auth)} className="ms-3 me-2">
+                Sign Out
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline-light" onClick={() => handleShowAuthModal('signUp')} className="me-2">
+                Sign Up
+              </Button>
+              <Button variant="outline-light" onClick={() => handleShowAuthModal('signIn')} className="ms-3 me-2">
+                Sign In
+              </Button>
+            </>
+          )}
+        </div>
+      </Navbar.Collapse>
+    </Navbar>
 
       <Routes>
         <Route path="/" element={<FrontPage />} />
