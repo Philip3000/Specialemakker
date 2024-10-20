@@ -3,7 +3,7 @@ import { Modal, Button, Form, Row, Col } from 'react-bootstrap';
 
 const CreatePostModal = ({ showCreateModal, handleCloseCreateModal, handleSubmit, formData, handleChange, universities }) => {
   return (
-    
+
     <Modal show={showCreateModal} onHide={handleCloseCreateModal}>
       <Modal.Header closeButton>
         <Modal.Title>Create a New Post</Modal.Title>
@@ -32,7 +32,7 @@ const CreatePostModal = ({ showCreateModal, handleCloseCreateModal, handleSubmit
                   name="description"
                   value={formData.description}
                   onChange={handleChange}
-                  placeholder="Enter description"
+                  placeholder="Describe your project in as many details as you want"
                   required
                 />
               </Form.Group>
@@ -58,13 +58,13 @@ const CreatePostModal = ({ showCreateModal, handleCloseCreateModal, handleSubmit
                   required
                 />
               </Form.Group>
-           
-              
+
+
             </Col>
 
             {/* Right Column */}
             <Col md={6} className="d-flex flex-column justify-content-between">
-            <Form.Group controlId="formUniversityName">
+              <Form.Group controlId="formUniversityName">
                 <Form.Label><strong>University Name</strong></Form.Label>
                 <Form.Control
                   as="select"
@@ -163,10 +163,10 @@ const CreatePostModal = ({ showCreateModal, handleCloseCreateModal, handleSubmit
                 </Col>
               </Form.Group>
 
-              
+
 
               <Form.Group controlId="formGradeImportance">
-                <Form.Label><strong>Grade Importance (1-10)</strong></Form.Label>
+                <Form.Label><strong>High grade effort (1-10)</strong></Form.Label>
                 <Form.Control
                   type="number"
                   name="gradeImportance"
@@ -174,11 +174,12 @@ const CreatePostModal = ({ showCreateModal, handleCloseCreateModal, handleSubmit
                   onChange={handleChange}
                   min="1"
                   max="10"
+                  placeholder='Ambitional level to get a high grade'
                   required
                 />
               </Form.Group>
               <Form.Group controlId="formAmountOfPeople">
-                <Form.Label><strong>Amount of People Needed</strong></Form.Label>
+                <Form.Label><strong>People wanted</strong></Form.Label>
                 <Form.Control
                   type="number"
                   name="amountOfPeople"
@@ -186,10 +187,38 @@ const CreatePostModal = ({ showCreateModal, handleCloseCreateModal, handleSubmit
                   onChange={handleChange}
                   min="1"
                   max="4"
+                  placeholder='How many people do you need for this project?'
                   required
                 />
               </Form.Group>
+
             </Col>
+            <hr className='mt-4' />
+            <Row>
+              <Col>
+                <Form.Group controlId="anonymousCheckbox" className=''>
+                  <Form.Check
+                    type="checkbox"
+                    label="Hide my name"
+                    name="isAnonymous"
+                    checked={formData.isAnonymous}
+                    onChange={handleChange}
+                  />
+                </Form.Group>
+              </Col>
+              <Col>
+                <Form.Group controlId="contactDetailsCheckbox" className=''>
+                  <Form.Check
+                    type="checkbox"
+                    label="Hide my contact details"
+                    name="noContact"
+                    checked={formData.noContact}
+                    onChange={handleChange}
+                  />
+                </Form.Group>
+              </Col>
+            </Row>
+
           </Row>
 
           <Button variant="primary" type="submit" className="w-100 mt-3">

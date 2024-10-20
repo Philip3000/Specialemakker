@@ -70,6 +70,9 @@ const App = () => {
     startYear: '',
     endMonth: '',
     endYear: '',
+    name: 'anon',
+    noContact: false,
+    isAnonymous: false,
     amountOfPeople: '',
     email: '',
     phone: '',
@@ -82,8 +85,8 @@ const App = () => {
     const fetchData = async () => {
       try {
         const [postsRes, universitiesRes] = await Promise.all([
-          axios.get('http://localhost:5000/posts'),
-          axios.get('http://localhost:5000/institutioner')
+          axios.get('https://us-central1-specialemakker-dk.cloudfunctions.net/api/posts'),
+          axios.get('https://us-central1-specialemakker-dk.cloudfunctions.net/api/institutioner')
         ]);
         setPosts(postsRes.data);
       if (user) {
@@ -147,19 +150,21 @@ const App = () => {
 
   // Handle form data changes
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prevState => ({ ...prevState, [name]: value }));
+    const { name, type, checked, value } = e.target;
+    setFormData(prevState => ({
+      ...prevState,
+      [name]: type === 'checkbox' ? checked : value
+    }));
   };
-
   // Handle post submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     const time = `${formData.startMonth.slice(0, 3)} ${formData.startYear.slice(-2)}' to ${formData.endMonth.slice(0, 3)} ${formData.endYear.slice(-2)}'`;
     const maker = user ? user.uid : null; // Ensure user is available
-  
+    
     try {
        // Check if the user has already created a post
-       const existingPost = await axios.get(`http://localhost:5000/posts?maker=${maker}`);
+       const existingPost = await axios.get(`https://us-central1-specialemakker-dk.cloudfunctions.net/api/posts?maker=${maker}`);
 
        if (existingPost.data.length > 0) {
          // If the user already has a post, display a warning message
@@ -168,7 +173,18 @@ const App = () => {
          setShowMessage(true);
          return;
        }
-      const response = await axios.post('http://localhost:5000/posts', { 
+       if (!formData.isAnonymous) {
+        formData.name = userData.name
+       }
+       if (!formData.noContact) {
+        if (userData?.email) {
+          formData.email = userData.email; // Only set email if userData.email is not null/undefined
+        }
+        if (userData?.phone) {
+          formData.phone = userData.phone; // Only set phone if userData.phone is not null/undefined
+        }
+       }
+      const response = await axios.post('https://us-central1-specialemakker-dk.cloudfunctions.net/api/posts', { 
         ...formData, 
         time, 
         maker
@@ -185,12 +201,16 @@ const App = () => {
         startYear: '',
         endMonth: '',
         endYear: '',
+        name: '',
+        isAnonymous: false,
+        noContact: false,
         amountOfPeople: '',
         email: '',
         phone: '',
-        gradeImportance: '',
+        gradeImportance: '', 
       });
       setShowCreateModal(false);
+      setMessageType('success');
       setMessage('Post created succesfully')
       setShowMessage(true);
     } catch (error) {
@@ -233,7 +253,7 @@ const App = () => {
           phone: '',
           universityName: '',
           fieldOfStudy: '',
-          role: 'admin',
+          role: 'user',
         };
         await setDoc(doc(firestore, 'users', newUser.uid), userData);
   
@@ -268,7 +288,9 @@ const App = () => {
     <div>
       
     <Navbar bg="dark" variant="dark" expand="lg">
-  <Navbar.Brand href="/" className='ml-5'>Specialemakker.dk</Navbar.Brand>
+  <Navbar.Brand href="/" className='ms-3' style={{ color: '#87CEFA' }} >
+  Specialemakker.dk
+  </Navbar.Brand>
   
   {/* Navbar toggle for small screens */}
   <Navbar.Toggle aria-controls="basic-navbar-nav" />
@@ -278,17 +300,16 @@ const App = () => {
     <Nav className="mr-auto">
       <Nav.Link href="/">Home <HouseFill className="me-1 align-middle" /></Nav.Link>
       <Nav.Link href="/posts">Posts <Stack className='me-1 align-middle'/></Nav.Link>
-      
     </Nav>
     </Navbar.Collapse>
 
     {/* Authentication buttons */}
     <div style={{ display: 'flex', alignItems: 'center', marginLeft: 'auto', marginRight: '20px' }}>
-    {user && role === 'admin' && (
-        <Button variant="primary" onClick={() => setShowCreateModal(true)} className="me-2">
-          Create Post <FileEarmarkPlusFill className="me-1" />
-        </Button>
-      )}
+    {(user && (role === 'admin' || role === 'user')) && (
+  <Button variant="primary" onClick={() => setShowCreateModal(true)} className="me-2">
+    Create Post <FileEarmarkPlusFill className="me-1" />
+  </Button>
+)}
       {user ? (
         <>
           <div style={{ marginRight: '20px'}}>
@@ -301,9 +322,15 @@ const App = () => {
           </Button>
         </>
       ) : (
-        <Button variant="outline-light" onClick={() => handleShowAuthModal('signIn')}>
+        <>
+        <Button variant="outline-light" onClick={() => handleShowAuthModal('signUp')}>
+                    Sign Up
+                  </Button>
+        <Button variant="outline-light" onClick={() => handleShowAuthModal('signIn')} className="ms-3">
           Sign In
         </Button>
+        </>
+      
       )}
     </div>
 </Navbar>

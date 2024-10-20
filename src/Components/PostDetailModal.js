@@ -8,8 +8,10 @@ const PostDetailModal = ({ show, handleClose, post }) => {
   const [showContactModal, setShowContactModal] = useState(false);
   const [user, setUser] = useState(null); 
 
-  const handleShowContactModal = () => setShowContactModal(true);
-  const handleCloseContactModal = () => setShowContactModal(false);
+  const handleShowContactModal = () => {
+    handleClose(); // Close PostDetailModal
+    setShowContactModal(true); // Show ContactUserModal
+  };  const handleCloseContactModal = () => setShowContactModal(false);
 
   // Fetch current user's data when component loads
   useEffect(() => {
@@ -25,6 +27,7 @@ const PostDetailModal = ({ show, handleClose, post }) => {
 
     const currentUser = auth.currentUser;
     if (currentUser) {
+      console.log(currentUser.uid)
       fetchUserData(currentUser.uid);
     } else {
       console.log('No user logged in.');
@@ -39,18 +42,7 @@ const PostDetailModal = ({ show, handleClose, post }) => {
     return () => unsubscribe();
   }, []); 
 
-  const handleSendEmail = (message, includeEmail, includePhone) => {
-    let fullMessage = message;
-
-    if (includeEmail || includePhone) {
-      fullMessage += "\n\nContact info:";
-      if (includeEmail && user?.email) fullMessage += `\nEmail: ${user.email}`;
-      if (includePhone && user?.phone) fullMessage += `\nPhone: ${user.phone}`;
-    }
-
-    console.log("Email sent with message:", fullMessage);
-    setShowContactModal(false);
-  };
+  
 
 
   return (
@@ -60,13 +52,28 @@ const PostDetailModal = ({ show, handleClose, post }) => {
           <Modal.Title>{post?.title}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <p>{post?.description}</p>
+          <p><strong>Description:</strong> {post?.description}</p>
           <p><strong>Field of Study:</strong> {post?.fieldOfStudy}</p>
+          <p><strong>Subject:</strong> {post?.subject}</p>
           <p><strong>University:</strong> {post?.universityName}</p>
-          <p><strong>Time:</strong> {post?.time}</p>
+          <p><strong>Grade importance from 1-10:</strong> {post?.gradeImportance}</p>
+          <p><strong>Timeframe:</strong> {post?.time}</p>
+          {post?.name && (
+          <p><strong>Name:</strong> {post?.name}</p>
+          )}
+          {post?.email && (
+          <p><strong>Email:</strong> {post?.email}</p>
+          )}
+          {post?.phone && (
+          <p><strong>Phone:</strong> {post?.phone}</p>
+          )}
+
+          
         </Modal.Body>
         <Modal.Footer>
+          {user &&
           <Button onClick={handleShowContactModal}>Contact User</Button>
+}
           <Button variant="secondary" onClick={handleClose}>Close</Button>
         </Modal.Footer>
       </Modal>
@@ -75,9 +82,9 @@ const PostDetailModal = ({ show, handleClose, post }) => {
         <ContactUserModal
           show={showContactModal}
           handleClose={handleCloseContactModal}
-          handleSendEmail={handleSendEmail}
           user={user} 
           receiverUid={post.maker} 
+          name={post.name}
         />
       )}
     </>

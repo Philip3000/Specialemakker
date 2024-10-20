@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Modal, Button, Form } from 'react-bootstrap';
 const AuthModal = ({ show, handleClose, authMode, handleAuthChange, handleAuthSubmit, authFormData }) => {
   

@@ -3,7 +3,7 @@ import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import axios from 'axios';
 import { auth, firestore } from '../firebase';
 import { collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
-import { Container, Form, Button, Card, Row, Col } from 'react-bootstrap';
+import { Container, Form, Button, Card, Row, Col, Spinner } from 'react-bootstrap';
 import ResponseMessage from '../Components/ResponseMessage';
 import '../Components/ResponseMessage.css'; 
 
@@ -11,6 +11,7 @@ const ProfilePage = () => {
   const [universities, setUniversities] = useState([]);
   const [messages, setMessages] = useState([]); 
   const [loadingMessages, setLoadingMessages] = useState(true);
+  const [loadingPost, setLoadingPost] = useState(true);
   const [showMessage, setShowMessage] = useState(false);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('success');
@@ -37,6 +38,8 @@ const ProfilePage = () => {
     endMonth: '',
     endYear: '', 
     time: '',
+    noContact: false,
+    isAnonymous: false,    
     maker: '',
     amountOfPeople: 0,
     email: '',
@@ -46,6 +49,7 @@ const ProfilePage = () => {
   });
   const formatMessage = (message) => {
     let mainMessage = message;
+    let name = '';
     let email = '';
     let phone = '';
 
@@ -56,14 +60,15 @@ const ProfilePage = () => {
       const contactInfo = parts[1].trim();
 
       // Use regex to extract email and phone if present
+      const nameMatch = contactInfo.match(/Name:\s*([^\n]+)/);
       const emailMatch = contactInfo.match(/Email:\s*([^\n]+)/);
       const phoneMatch = contactInfo.match(/Phone:\s*([^\n]+)/);
-
+      if (nameMatch) name = nameMatch[1].trim();
       if (emailMatch) email = emailMatch[1].trim();
       if (phoneMatch) phone = phoneMatch[1].trim();
     }
 
-    return { mainMessage, email, phone };
+    return { mainMessage, name, email, phone };
   };
   const handleShowSuccess = () => {
     setMessage('Operation was successful!');
@@ -118,14 +123,14 @@ const ProfilePage = () => {
           }
   
           // Fetch the user's post
-          const existingPost = await axios.get(`http://localhost:5000/posts?maker=${userId}`);
+          const existingPost = await axios.get(`https://us-central1-specialemakker-dk.cloudfunctions.net/api/posts?maker=${userId}`);
           if (existingPost.data.length > 0) {
             setPost(existingPost.data[0]); 
             setPostData(existingPost.data[0]);
-            const [universitiesRes] = await Promise.all([axios.get('http://localhost:5000/institutioner')]);
+            const [universitiesRes] = await Promise.all([axios.get('https://us-central1-specialemakker-dk.cloudfunctions.net/api/institutioner')]);
             setUniversities(universitiesRes.data);
           }
-  
+          setLoadingPost(false);
         } catch (error) {
           console.error('Error fetching user data or messages:', error);
           handleShowError();
@@ -143,7 +148,7 @@ const ProfilePage = () => {
   const handleDeletePost = async () => {
     if (window.confirm("Are you sure you want to delete all posts and their related messages?")) {
       try {
-        const response = await axios.delete(`http://localhost:5000/posts`, {
+        const response = await axios.delete('https://us-central1-specialemakker-dk.cloudfunctions.net/api/posts', {
           data: {
             maker: auth.currentUser.uid, // The ID of the user who is deleting the post
           },
@@ -191,9 +196,12 @@ const ProfilePage = () => {
 
   // Handle input changes for post form
   const handlePostInputChange = (e) => {
-    const { name, value } = e.target;
+    const { name, type, checked, value } = e.target;
     setPostData((prevState) => {
-        const updatedState = { ...prevState, [name]: value };
+        const updatedState = { ...prevState, 
+          [name]: type === 'checkbox' ? checked : value
+          
+         };
         return updatedState;
     });
 };
@@ -233,8 +241,19 @@ const endYear = String(postData.endYear);
 
     if (post) {
       try {
+        if (!postData.isAnonymous) {
+          postData.name = profileData.name
+         }
+         if (!postData.noContact) {
+          if (profileData?.email) {
+            postData.email = profileData.email; // Only set email if userData.email is not null/undefined
+          }
+          if (profileData?.phone) {
+            postData.phone = profileData.phone; // Only set phone if userData.phone is not null/undefined
+          }
+         }
         // Send PUT request to update the post
-        const response = await axios.put(`http://localhost:5000/posts`, {
+        const response = await axios.put('https://us-central1-specialemakker-dk.cloudfunctions.net/api/posts', {
           maker: auth.currentUser.uid, // Add maker to the body
           ...postData, // This should be the updated post data
           time, // Include the formatted time
@@ -344,7 +363,7 @@ const endYear = String(postData.endYear);
                       />
                     )}
                   </Form.Group>
-                  <div className="text-center">
+                  <div className="text-center mt-5">
                     <Button type="submit" variant="success" className="me-2">Save Changes</Button>
                     <Button onClick={handleEditToggle} variant="secondary">Cancel</Button>
                   </div>
@@ -363,7 +382,12 @@ const endYear = String(postData.endYear);
                       </div>
                     </>
                   ) : (
+                    <div className="text-center">
+                    <Spinner animation="border" role="status">
+                      <span className="visually-hidden">Loading...</span>
+                    </Spinner>
                     <p>Loading profile data...</p>
+                  </div>
                   )}
                 </>
               )}
@@ -374,10 +398,15 @@ const endYear = String(postData.endYear);
           <Card.Title className="text-center mb-4">Messages</Card.Title>
           
           {loadingMessages ? (
-            <p>Loading messages...</p>
+             <div className="text-center">
+             <Spinner animation="border" role="status">
+               <span className="visually-hidden">Loading...</span>
+             </Spinner>
+             <p>Loading messages...</p>
+           </div>
           ) : messages.length > 0 ? (
             messages.map((message) => {
-              const { mainMessage, email, phone } = formatMessage(message.message); // Format the message
+              const { mainMessage, name, email, phone } = formatMessage(message.message); // Format the message
 
               return (
                 <div key={message.id} className="mb-3">
@@ -385,6 +414,7 @@ const endYear = String(postData.endYear);
                   <Card>
                   <Card.Body>
                     <Card.Text><strong>Message:</strong> {mainMessage}</Card.Text>
+                    <Card.Text> {name && <p><strong>Name:</strong> {name}</p>}</Card.Text>
                     <Card.Text> {email && <p><strong>Email:</strong> {email}</p>}</Card.Text>
                     <Card.Text> {phone && <p><strong>Phone:</strong> {phone}</p>}</Card.Text>
                   </Card.Body>
@@ -405,7 +435,14 @@ const endYear = String(postData.endYear);
             <Card.Body>
               <Card.Title className="text-center mb-4">Your Post</Card.Title>
 
-              {post ? (
+              {loadingPost ? (
+             <div className="text-center">
+             <Spinner animation="border" role="status">
+               <span className="visually-hidden">Loading...</span>
+             </Spinner>
+             <p>Loading post...</p>
+           </div>
+          ) : post ? (
                 postEditMode ? (
                   <Form onSubmit={handlePostSubmit}>
                     <Form.Group className="mb-3" controlId="formPostTitle">
@@ -439,7 +476,7 @@ const endYear = String(postData.endYear);
                         required
                       />
                     </Form.Group>
-                    <Form.Group controlId="formUniversityName">
+                    <Form.Group className='mb-3' controlId="formUniversityName">
                       <Form.Label><strong>University Name</strong></Form.Label>
                       <Form.Control
                         as="select"
@@ -476,7 +513,7 @@ const endYear = String(postData.endYear);
                         required
                       />
                     </Form.Group>
-                    <Form.Group as={Row} controlId="formStart">
+                    <Form.Group as={Row} className='mb-3' controlId="formStart">
                       <Col md={6}>
                         <Form.Label><strong>Start Month</strong></Form.Label>
                         <Form.Control
@@ -512,7 +549,7 @@ const endYear = String(postData.endYear);
                       </Col>
                     </Form.Group>
 
-                    <Form.Group as={Row} controlId="formEnd">
+                    <Form.Group as={Row} className='mb-3' controlId="formEnd">
                       <Col md={6}>
                         <Form.Label><strong>End Month</strong></Form.Label>
                         <Form.Control
@@ -550,7 +587,7 @@ const endYear = String(postData.endYear);
 
 
                     <Form.Group className="mb-3" controlId="formPostAmountOfPeople">
-                      <Form.Label><strong>Amount of People</strong></Form.Label>
+                      <Form.Label><strong>People wanted</strong></Form.Label>
                       <Form.Control
                         type="number"
                         name="amountOfPeople"
@@ -574,7 +611,26 @@ const endYear = String(postData.endYear);
                   required
                       />
                     </Form.Group>
-
+                <Form.Group controlId="anonymousCheckbox" className=''>
+                  <Form.Check
+                    type="checkbox"
+                    label="Hide my name"
+                    name="isAnonymous"
+                    checked={postData.isAnonymous}
+                    onChange={handlePostInputChange}
+                  />
+                </Form.Group>
+              
+                <Form.Group controlId="contactDetailsCheckbox" className=''>
+                  <Form.Check
+                    type="checkbox"
+                    label="Hide my contact details"
+                    name="noContact"
+                    checked={postData.noContact}
+                    onChange={handlePostInputChange}
+                  />
+                </Form.Group>
+              <hr className='mt-2'/>
                     <div className="text-center">
                       <Button type="submit" variant="success" className="me-2">Save Changes</Button>
                       <Button onClick={handlePostEditToggle} variant="secondary">Cancel</Button>
@@ -588,8 +644,8 @@ const endYear = String(postData.endYear);
                     <p><strong>University Name:</strong> {post.universityName}</p>
                     <p><strong>Field of Study:</strong> {post.fieldOfStudy}</p>
                     <p><strong>Time:</strong> {post.time}</p>
-                    <p><strong>Amount of People:</strong> {post.amountOfPeople}</p>
-                    <p><strong>Grade Importance:</strong> {post.gradeImportance}</p>
+                    <p><strong>People wanted</strong> {post.amountOfPeople}</p>
+                    <p><strong>High Grade Importance:</strong> {post.gradeImportance}</p>
                     <div className="text-center">
                       <Button onClick={handlePostEditToggle} variant="primary">Edit Post</Button>
                       <Button onClick={handleDeletePost} variant="danger" className="ms-2 ml-3">
